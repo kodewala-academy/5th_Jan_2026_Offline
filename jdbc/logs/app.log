@@ -1,0 +1,14 @@
+2026-05-05 11:33:09 INFO  com.kodewala.jdbc.prep.stmt.txn.DebitAndCredit -  Sender current balance is -9000
+2026-05-05 11:33:09 INFO  com.kodewala.jdbc.prep.stmt.txn.DebitAndCredit -  Record update... 1
+2026-05-05 11:33:09 INFO  com.kodewala.jdbc.prep.stmt.txn.DebitAndCredit -  Receiver current balance is 36000
+2026-05-05 11:33:09 ERROR com.kodewala.jdbc.prep.stmt.txn.DebitAndCredit -  doing rollback....
+java.sql.SQLException: Parameter index out of range (3 > number of parameters, which is 2).
+	at com.mysql.cj.jdbc.exceptions.SQLError.createSQLException(SQLError.java:129) ~[mysql-connector-j-8.0.32.jar:8.0.32]
+	at com.mysql.cj.jdbc.exceptions.SQLError.createSQLException(SQLError.java:97) ~[mysql-connector-j-8.0.32.jar:8.0.32]
+	at com.mysql.cj.jdbc.exceptions.SQLError.createSQLException(SQLError.java:89) ~[mysql-connector-j-8.0.32.jar:8.0.32]
+	at com.mysql.cj.jdbc.exceptions.SQLError.createSQLException(SQLError.java:63) ~[mysql-connector-j-8.0.32.jar:8.0.32]
+	at com.mysql.cj.jdbc.ClientPreparedStatement.checkBounds(ClientPreparedStatement.java:1345) ~[mysql-connector-j-8.0.32.jar:8.0.32]
+	at com.mysql.cj.jdbc.ClientPreparedStatement.getCoreParameterIndex(ClientPreparedStatement.java:1358) ~[mysql-connector-j-8.0.32.jar:8.0.32]
+	at com.mysql.cj.jdbc.ClientPreparedStatement.setInt(ClientPreparedStatement.java:1536) ~[mysql-connector-j-8.0.32.jar:8.0.32]
+	at com.kodewala.jdbc.prep.stmt.txn.DebitAndCredit.doFundTransfer(DebitAndCredit.java:64) [classes/:?]
+	at com.kodewala.jdbc.prep.stmt.txn.Driver.main(Driver.java:11) [classes/:?]

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN 2.0//EN"
+        "http://www.springframework.org/dtd/spring-beans-2.0.dtd">
+
+<beans>
+
+<!-- bean definitions here -->
+
+<bean class="com.kodewala.bean.Account" id="acc">
+   <property name="accNo" value="32144325345423624" />
+</bean>
+
+<bean class="com.kodewala.bean.Account" id="acc1">
+   <property name="accNo" value="32144325345423624" />
+</bean>
+
+</beans>
