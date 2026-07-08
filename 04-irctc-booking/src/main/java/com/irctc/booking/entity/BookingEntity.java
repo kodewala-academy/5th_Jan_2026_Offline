@@ -12,7 +12,8 @@ public class BookingEntity
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long bookingId;
-
+	private String pnr;
+	private String userId;
 	private String fromStation;
 
 	private String toStation;
@@ -105,6 +106,26 @@ public class BookingEntity
 	public void setGender(String gender)
 	{
 		this.gender = gender;
+	}
+	
+	public String getUserId()
+	{
+		return userId;
+	}
+
+	public void setUserId(String userId)
+	{
+		this.userId = userId;
+	}
+
+	public String getPnr()
+	{
+		return pnr;
+	}
+
+	public void setPnr(String pnr)
+	{
+		this.pnr = pnr;
 	}
 
 }

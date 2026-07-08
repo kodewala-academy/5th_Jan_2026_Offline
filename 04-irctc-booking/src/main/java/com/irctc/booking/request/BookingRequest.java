@@ -7,6 +7,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class BookingRequest
 {
 
+	private String userId;
+	
 	private String from;
 
 	private String to;
@@ -90,6 +92,16 @@ public class BookingRequest
 	public void setGender(String gender)
 	{
 		this.gender = gender;
+	}
+
+	public String getUserId()
+	{
+		return userId;
+	}
+
+	public void setUserId(String userId)
+	{
+		this.userId = userId;
 	}
 
 }
