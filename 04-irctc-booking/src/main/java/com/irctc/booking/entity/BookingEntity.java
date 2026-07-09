@@ -27,6 +27,8 @@ public class BookingEntity
 	private Integer age;
 
 	private String gender;
+	
+	private String status;
 
 	public Long getBookingId()
 	{
@@ -126,6 +128,16 @@ public class BookingEntity
 	public void setPnr(String pnr)
 	{
 		this.pnr = pnr;
+	}
+
+	public String getStatus()
+	{
+		return status;
+	}
+
+	public void setStatus(String status)
+	{
+		this.status = status;
 	}
 
 }
