@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.irctc.booking.entity.BookingEntity;
+import com.irctc.booking.exception.InSufficientBalanceException;
 import com.irctc.booking.payment.entity.PaymentEntity;
 import com.irctc.booking.payment.repository.PaymentRepo;
 import com.irctc.booking.repository.BookingRepository;
@@ -80,11 +81,19 @@ public class BookingService
 		paymentEntity.setAmount(1235);
 		paymentEntity.setBookingId(bookingEntity.getBookingId());
 		paymentEntity.setTransactionId("TXN23435");
-		
-		String statsuFromPG=null;
-		paymentEntity.setPaymentStatus(statsuFromPG.concat("some text..."));
-		
-        // 2nd
+
+		try
+		{
+			String statsuFromPG = null;
+			paymentEntity.setPaymentStatus(statsuFromPG.concat("some text..."));
+		} catch (Exception e)
+		{
+
+			e.printStackTrace();
+			throw new InSufficientBalanceException("User does not have enough balance to book ticket.");
+		}
+
+		// 2nd
 		PaymentEntity paymentEntityResponse = paymentRepo.save(paymentEntity);
 		BookingResponse response = null;
 		if (paymentEntityResponse.getPaymentId() > 0)
