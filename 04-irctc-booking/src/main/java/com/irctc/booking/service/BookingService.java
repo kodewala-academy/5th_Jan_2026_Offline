@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import com.irctc.booking.entity.BookingEntity;
 import com.irctc.booking.exception.InSufficientBalanceException;
+import com.irctc.booking.kafka.producer.service.KafkaService;
 import com.irctc.booking.payment.entity.PaymentEntity;
 import com.irctc.booking.payment.repository.PaymentRepo;
 import com.irctc.booking.repository.BookingRepository;
@@ -30,6 +31,9 @@ public class BookingService
 
 	@Autowired
 	PaymentRepo paymentRepo;
+
+	@Autowired
+	KafkaService kafkaService;
 
 	public List<BookingResponse> getAllTickets(String userId, String pageNumber, String pageSize)
 	{
@@ -82,16 +86,15 @@ public class BookingService
 		paymentEntity.setBookingId(bookingEntity.getBookingId());
 		paymentEntity.setTransactionId("TXN23435");
 
-		try
-		{
-			String statsuFromPG = null;
-			paymentEntity.setPaymentStatus(statsuFromPG.concat("some text..."));
-		} catch (Exception e)
-		{
-
-			e.printStackTrace();
-			throw new InSufficientBalanceException("User does not have enough balance to book ticket.");
-		}
+		/*
+		 * try { String statsuFromPG = null;
+		 * paymentEntity.setPaymentStatus(statsuFromPG.concat("some text...")); } catch
+		 * (Exception e) {
+		 * 
+		 * e.printStackTrace(); throw new
+		 * InSufficientBalanceException("User does not have enough balance to book ticket."
+		 * ); }
+		 */
 
 		// 2nd
 		PaymentEntity paymentEntityResponse = paymentRepo.save(paymentEntity);
@@ -113,6 +116,15 @@ public class BookingService
 			response.setSeatNumber("32");
 			response.setMessage("Ticket booked successfully.");
 		}
+		for (int i = 0; i < 500; i++)
+		{
+
+			// Send events to Kafka for notification.
+			String message = " This is test message and pnr is " + response.getPnrNumber();
+			kafkaService.publishMessage("booking-confirmed", message);
+			System.out.println(" Event published to kafka...... " + message);
+		}
+
 		return response;
 
 	}
