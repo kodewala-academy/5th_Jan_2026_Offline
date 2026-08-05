@@ -34,6 +34,9 @@ public class BookingService
 
 	@Autowired
 	KafkaService kafkaService;
+	
+	@Autowired
+	PaymentClient paymentClient;
 
 	public List<BookingResponse> getAllTickets(String userId, String pageNumber, String pageSize)
 	{
@@ -81,8 +84,13 @@ public class BookingService
 		bookingEntity = bookingRepository.save(bookingEntity);
 
 		// init the payment
+		int amount = 13000;
+		String paymentResponse = paymentClient.makePayment(amount);
+		
+		System.out.println(" Response from payment : "+ paymentResponse);
+		
 		PaymentEntity paymentEntity = new PaymentEntity();
-		paymentEntity.setAmount(1235);
+		paymentEntity.setAmount(amount);
 		paymentEntity.setBookingId(bookingEntity.getBookingId());
 		paymentEntity.setTransactionId("TXN23435");
 
