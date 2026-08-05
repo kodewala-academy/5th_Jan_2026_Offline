@@ -1,0 +1,7 @@
+spring:
+  config:
+    import: "configserver:http://localhost:8888"
+  application:
+    name: 05-payment-service
+  profiles:
+    active: qa
