@@ -4,4 +4,4 @@ spring:
   application:
     name: 04-irctc-booking
   profiles:
-    active: dev
+    active: qa

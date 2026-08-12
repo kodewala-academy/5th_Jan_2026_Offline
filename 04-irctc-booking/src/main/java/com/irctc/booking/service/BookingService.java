@@ -9,10 +9,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestParam;
 
 import com.irctc.booking.entity.BookingEntity;
-import com.irctc.booking.exception.InSufficientBalanceException;
 import com.irctc.booking.kafka.producer.service.KafkaService;
 import com.irctc.booking.payment.entity.PaymentEntity;
 import com.irctc.booking.payment.repository.PaymentRepo;
@@ -20,6 +18,7 @@ import com.irctc.booking.repository.BookingRepository;
 import com.irctc.booking.request.BookingRequest;
 import com.irctc.booking.response.BookingResponse;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import jakarta.transaction.Transactional;
 
 @Service
@@ -34,7 +33,7 @@ public class BookingService
 
 	@Autowired
 	KafkaService kafkaService;
-	
+
 	@Autowired
 	PaymentClient paymentClient;
 
@@ -64,7 +63,7 @@ public class BookingService
 
 	}
 
-	@Transactional
+	@CircuitBreaker(name = "paymentService", fallbackMethod = "paymentFallback")
 	public BookingResponse doBooking(BookingRequest bookingRequest)
 	{
 		BookingEntity bookingEntity = new BookingEntity();
@@ -86,9 +85,9 @@ public class BookingService
 		// init the payment
 		int amount = 13000;
 		String paymentResponse = paymentClient.makePayment(amount);
-		
-		System.out.println(" Response from payment : "+ paymentResponse);
-		
+
+		System.out.println(" Response from payment : " + paymentResponse);
+
 		PaymentEntity paymentEntity = new PaymentEntity();
 		paymentEntity.setAmount(amount);
 		paymentEntity.setBookingId(bookingEntity.getBookingId());
@@ -124,7 +123,7 @@ public class BookingService
 			response.setSeatNumber("32");
 			response.setMessage("Ticket booked successfully.");
 		}
-		for (int i = 0; i < 500; i++)
+		for (int i = 0; i < 2; i++)
 		{
 
 			// Send events to Kafka for notification.
@@ -142,5 +141,18 @@ public class BookingService
 		Random random = new Random();
 		long pnr = 1000000000L + (long) (random.nextDouble() * 9000000000L);
 		return String.valueOf(pnr);
+	}
+
+	public BookingResponse paymentFallback(BookingRequest bookingRequest, Exception ex)
+	{
+
+		System.out.println("Circuit Breaker Triggered : " + ex.getMessage());
+
+		BookingResponse response = new BookingResponse();
+
+		response.setBookingStatus("FAILED");
+		response.setMessage("Payment Service is currently unavailable. Please try again later.");
+
+		return response;
 	}
 }
