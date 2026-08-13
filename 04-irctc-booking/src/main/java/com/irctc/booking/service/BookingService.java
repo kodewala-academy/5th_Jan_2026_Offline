@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -19,11 +21,14 @@ import com.irctc.booking.request.BookingRequest;
 import com.irctc.booking.response.BookingResponse;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import jakarta.transaction.Transactional;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 
 @Service
 public class BookingService
 {
+
+	private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 
 	@Autowired
 	BookingRepository bookingRepository;
@@ -37,120 +42,220 @@ public class BookingService
 	@Autowired
 	PaymentClient paymentClient;
 
+	@Autowired
+	Tracer tracer;
+
 	public List<BookingResponse> getAllTickets(String userId, String pageNumber, String pageSize)
 	{
 
+		log.info("getAllTickets() START - userId={}, pageNumber={}, pageSize={}", userId, pageNumber, pageSize);
+
 		Pageable pageable = PageRequest.of(Integer.parseInt(pageNumber), Integer.parseInt(pageSize));
 
-		Page<BookingEntity> tickets = bookingRepository.findAll(pageable); // pagination
+		Page<BookingEntity> tickets = bookingRepository.findAll(pageable);
 
 		List<BookingResponse> response = new ArrayList<BookingResponse>();
 
 		for (BookingEntity bookingEntity : tickets)
 		{
+
 			BookingResponse ticketResponse = new BookingResponse();
 
 			ticketResponse.setBookingId(bookingEntity.getBookingId());
+
 			ticketResponse.setPnrNumber(bookingEntity.getPnr());
-			ticketResponse.setBookingStatus("CONFIRMED"); // Or WAITING, RAC, etc.
+
+			ticketResponse.setBookingStatus("CONFIRMED");
+
 			ticketResponse.setJourneyDate(bookingEntity.getJourneyDate());
+
 			ticketResponse.setCoach("B2");
 			ticketResponse.setSeatNumber("32");
+
 			response.add(ticketResponse);
 		}
 
-		return response;
+		log.info("getAllTickets() END - totalTickets={}", response.size());
 
+		return response;
 	}
 
 	@CircuitBreaker(name = "paymentService", fallbackMethod = "paymentFallback")
 	public BookingResponse doBooking(BookingRequest bookingRequest)
 	{
+
+		log.info("=================================================");
+		log.info("BookingService.doBooking() START");
+		log.info("Passenger: {}", bookingRequest.getPassengerName());
+		log.info("From: {}", bookingRequest.getFrom());
+		log.info("To: {}", bookingRequest.getTo());
+		log.info("=================================================");
+
+		// Current Trace / Span
+		Span currentSpan = tracer.currentSpan();
+
+		if (currentSpan != null)
+		{
+
+			log.info("BOOKING TRACE -> traceId={}, spanId={}", currentSpan.context().traceId(),
+					currentSpan.context().spanId());
+
+		} else
+		{
+
+			log.warn("BOOKING TRACE -> No current span found");
+		}
+
+		// -------------------------------------------------
+		// Create Booking
+		// -------------------------------------------------
+
 		BookingEntity bookingEntity = new BookingEntity();
 
 		bookingEntity.setFromStation(bookingRequest.getFrom());
+
 		bookingEntity.setToStation(bookingRequest.getTo());
+
 		bookingEntity.setJourneyDate(bookingRequest.getDate());
+
 		bookingEntity.setTravelClass(bookingRequest.getTravelClass());
+
 		bookingEntity.setPassengerName(bookingRequest.getPassengerName());
+
 		bookingEntity.setAge(bookingRequest.getAge());
+
 		bookingEntity.setGender(bookingRequest.getGender());
+
 		bookingEntity.setUserId(bookingRequest.getUserId());
-		// bookingEntity.setPnr(generatePnr());
+
 		bookingEntity.setStatus("BOOKING_INIT");
 
-		// create a booking record. - 1st query
+		log.info("Saving initial booking...");
+
+		// 1st query
 		bookingEntity = bookingRepository.save(bookingEntity);
 
-		// init the payment
+		log.info("Booking created successfully. bookingId={}", bookingEntity.getBookingId());
+
+		// -------------------------------------------------
+		// Payment
+		// -------------------------------------------------
+
 		int amount = 13000;
+
+		log.info("Calling Payment Service through Feign. amount={}", amount);
+
 		String paymentResponse = paymentClient.makePayment(amount);
 
-		System.out.println(" Response from payment : " + paymentResponse);
+		log.info("Response received from Payment Service: {}", paymentResponse);
+
+		// -------------------------------------------------
+		// Create Payment Record
+		// -------------------------------------------------
 
 		PaymentEntity paymentEntity = new PaymentEntity();
+
 		paymentEntity.setAmount(amount);
+
 		paymentEntity.setBookingId(bookingEntity.getBookingId());
+
 		paymentEntity.setTransactionId("TXN23435");
 
-		/*
-		 * try { String statsuFromPG = null;
-		 * paymentEntity.setPaymentStatus(statsuFromPG.concat("some text...")); } catch
-		 * (Exception e) {
-		 * 
-		 * e.printStackTrace(); throw new
-		 * InSufficientBalanceException("User does not have enough balance to book ticket."
-		 * ); }
-		 */
+		log.info("Saving payment record for bookingId={}", bookingEntity.getBookingId());
 
-		// 2nd
+		// 2nd query
 		PaymentEntity paymentEntityResponse = paymentRepo.save(paymentEntity);
+
+		log.info("Payment record saved. paymentId={}", paymentEntityResponse.getPaymentId());
+
+		// -------------------------------------------------
+		// Update Booking
+		// -------------------------------------------------
+
 		BookingResponse response = null;
+
 		if (paymentEntityResponse.getPaymentId() > 0)
 		{
+
 			bookingEntity.setPnr(generatePnr());
+
 			bookingEntity.setStatus("BOOKED");
-			// update a booking record. 3rd
+
+			log.info("Payment successful. Updating booking. bookingId={}, pnr={}", bookingEntity.getBookingId(),
+					bookingEntity.getPnr());
+
+			// 3rd query
 			BookingEntity bookingEntityUpdated = bookingRepository.save(bookingEntity);
 
 			response = new BookingResponse();
 
 			response.setBookingId(bookingEntityUpdated.getBookingId());
+
 			response.setPnrNumber(bookingEntityUpdated.getPnr());
-			response.setBookingStatus("CONFIRMED"); // Or WAITING, RAC, etc.
+
+			response.setBookingStatus("CONFIRMED");
+
 			response.setJourneyDate(bookingEntityUpdated.getJourneyDate());
+
 			response.setCoach("B2");
+
 			response.setSeatNumber("32");
+
 			response.setMessage("Ticket booked successfully.");
+
+			log.info("Booking completed successfully. bookingId={}, pnr={}", bookingEntityUpdated.getBookingId(),
+					bookingEntityUpdated.getPnr());
 		}
+
+		// -------------------------------------------------
+		// Kafka Events
+		// -------------------------------------------------
+
 		for (int i = 0; i < 2; i++)
 		{
 
-			// Send events to Kafka for notification.
-			String message = " This is test message and pnr is " + response.getPnrNumber();
+			String message = "This is test message and pnr is " + response.getPnrNumber();
+
+			log.info("Publishing Kafka event. topic=booking-confirmed, message={}", message);
+
 			kafkaService.publishMessage("booking-confirmed", message);
-			System.out.println(" Event published to kafka...... " + message);
+
+			log.info("Kafka event published successfully.");
 		}
 
-		return response;
+		log.info("BookingService.doBooking() END");
 
+		return response;
 	}
 
 	public static String generatePnr()
 	{
+
 		Random random = new Random();
+
 		long pnr = 1000000000L + (long) (random.nextDouble() * 9000000000L);
+
 		return String.valueOf(pnr);
 	}
 
 	public BookingResponse paymentFallback(BookingRequest bookingRequest, Exception ex)
 	{
 
-		System.out.println("Circuit Breaker Triggered : " + ex.getMessage());
+		log.error("Circuit Breaker Triggered for Payment Service. Error: {}", ex.getMessage(), ex);
+
+		Span currentSpan = tracer.currentSpan();
+
+		if (currentSpan != null)
+		{
+
+			log.error("PAYMENT FALLBACK TRACE -> traceId={}, spanId={}", currentSpan.context().traceId(),
+					currentSpan.context().spanId());
+		}
 
 		BookingResponse response = new BookingResponse();
 
 		response.setBookingStatus("FAILED");
+
 		response.setMessage("Payment Service is currently unavailable. Please try again later.");
 
 		return response;
